@@ -20,11 +20,11 @@ COPY . .
 # Set PYTHONPATH so that 'backend' module is resolvable
 ENV PYTHONPATH=/app
 
-# Expose port (standard container configuration)
-EXPOSE 8000
+# Expose port (standard Hugging Face container configuration)
+EXPOSE 7860
 
 # Environment variables
-ENV PORT=8000
+ENV PORT=7860
 
 # Run the web service using uvicorn, binding to the active PORT assigned by the host
 CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"]
