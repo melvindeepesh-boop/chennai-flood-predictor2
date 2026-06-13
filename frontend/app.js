@@ -1213,7 +1213,7 @@ async function checkBackendHealth() {
     const statusText = statusBadge.querySelector("span");
 
     try {
-        const response = await fetch("http://localhost:8000/health");
+        const response = await fetch("/health");
         if (response.ok) {
             const data = await response.json();
             if (data.models_loaded) {
@@ -1731,7 +1731,7 @@ async function handlePredictionRequest() {
         // Execute API fetch
         try {
             // First geocode the neighborhood name to get coords
-            const geocodeRes = await fetch(`http://localhost:8000/geocode?area_name=${encodeURIComponent(areaName)}`);
+            const geocodeRes = await fetch(`/geocode?area_name=${encodeURIComponent(areaName)}`);
             if (!geocodeRes.ok) {
                 throw new Error("Geocoding neighborhood failed.");
             }
@@ -1759,7 +1759,7 @@ async function handlePredictionRequest() {
                 bodyObj.is_monsoon = currentWeatherPreset.isMonsoon ? 1 : 0;
             }
 
-            const predictRes = await fetch("http://localhost:8000/predict", {
+            const predictRes = await fetch("/predict", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(bodyObj)
@@ -1866,7 +1866,7 @@ async function handleGPSRequest() {
                     bodyObj.is_monsoon = currentWeatherPreset.isMonsoon ? 1 : 0;
                 }
 
-                const predictRes = await fetch("http://localhost:8000/predict", {
+                const predictRes = await fetch("/predict", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(bodyObj)
@@ -1934,7 +1934,7 @@ async function handleGPSRequest() {
             console.warn("Geolocation query failed: ", error.message, "trying IP geolocation fallback...");
             
             try {
-                const ipRes = await fetch("http://localhost:8000/geocode/ip");
+                const ipRes = await fetch("/geocode/ip");
                 if (ipRes.ok) {
                     const ipData = await ipRes.json();
                     const lat = ipData.lat;
