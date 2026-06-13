@@ -253,12 +253,11 @@ body {
 .app-wrapper {
     position: relative;
     z-index: 4;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 2rem 1rem;
     min-height: 100vh;
     display: flex;
-    flex-col: column;
     flex-direction: column;
     gap: 2rem;
 }
@@ -1302,6 +1301,10 @@ h1 {
     }
     
     #map {
+        min-height: 380px;
+    }
+    
+    .map-radar-wrapper {
         min-height: 380px;
     }
     
