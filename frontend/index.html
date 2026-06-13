@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chennai Flood Predictor - XGBoost & LSTM Hydrological Ensemble Model</title>
+    <meta name="description" content="Immersive AI-driven flood risk prediction and forecasting dashboard for Chennai. Integrates live OpenWeatherMap datasets, PyTorch LSTM rainfall forecasts, and XGBoost flood risk explainability.">
+    <link rel="stylesheet" href="style.css?v=11">
+    <!-- Chart.js CDN for dual-axis charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet.js CDN for spatial map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        /* Dialog specific styling since it's not present in style.css */
+        dialog {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 2rem;
+            color: #ffffff;
+            max-width: 600px;
+            width: 90%;
+            margin: auto;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        dialog::backdrop {
+            background: rgba(3, 5, 10, 0.75);
+            backdrop-filter: blur(6px);
+        }
+        .dialog-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+        .dialog-header h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+        .dialog-close {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 1.5rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .dialog-close:hover {
+            color: #ffffff;
+        }
+        .dialog-content {
+            font-size: 14px;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .dialog-content p {
+            color: rgba(255, 255, 255, 0.85);
+        }
+        .dialog-content ul {
+            padding-left: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .dialog-content li strong {
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Liquid caustics background -->
+    <div class="water-backdrop"></div>
+    <!-- High-tech 3D perspective cyber grid backdrop -->
+    <div class="cyber-grid"></div>
+    <!-- Glowing neon hydrological flow contour lines -->
+    <div class="topological-flows">
+        <svg viewBox="0 0 1440 900" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M-100,200 C300,100 500,400 900,250 C1200,150 1300,350 1600,200" fill="none" stroke="rgba(0, 242, 254, 0.16)" stroke-width="2.5" class="contour-line pulse-1" />
+            <path d="M-100,500 C400,300 600,700 1000,450 C1200,300 1300,600 1600,500" fill="none" stroke="rgba(56, 249, 215, 0.12)" stroke-width="2" class="contour-line pulse-2" />
+            <path d="M-100,350 C200,550 500,300 800,500 C1100,650 1200,400 1600,450" fill="none" stroke="rgba(177, 92, 255, 0.14)" stroke-width="2" class="contour-line pulse-3" />
+            <path d="M-100,700 C300,500 600,800 900,650 C1100,550 1300,750 1600,650" fill="none" stroke="rgba(76, 201, 240, 0.16)" stroke-width="2.5" class="contour-line pulse-4" />
+        </svg>
+    </div>
+
+    <!-- Background overlay shade -->
+    <div class="bg-overlay-shade"></div>
+
+    <!-- Viewport storm rain renderer -->
+    <canvas id="rain-canvas"></canvas>
+
+    <!-- Lightning flash container -->
+    <div id="lightning-flash"></div>
+
+    <!-- Main page structure wrapper -->
+    <div class="app-wrapper">
+        <header>
+            <div class="header-left">
+                <div class="logo-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.6 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
+                        <path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.6 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
+                        <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.6 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Chennai Flood Predictor</h1>
+                    <div class="subtitle">Real-Time Hydrological Forecasting powered by an Ensemble of XGBoost & LSTM Neural Networks</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                <div class="status-badge" id="backend-status">
+                    <div class="pulse-dot"></div>
+                    <span>Initializing Model...</span>
+                </div>
+                
+                <div class="audio-switch enabled" id="animation-toggle-btn" title="Toggles the visual rain and lightning animations on the dashboard.">
+                    <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    <span>Disable Animation</span>
+                </div>
+
+                <div class="audio-controls-group">
+                    <div class="audio-switch" id="audio-toggle-btn" title="Plays sound of falling rain and thunder using synthesized Web Audio or loaded audio tracks.">
+                        <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        </svg>
+                        <span>Enable Audio</span>
+                    </div>
+                    <select id="audio-track-select" class="audio-select" title="Choose the storm audio source.">
+                        <option value="synth">Synthesized Storm</option>
+                        <option value="heavy">Heavy Rain & Thunder (Pixabay)</option>
+                        <option value="natural">Natural Rain & Thunder (Freesound)</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <!-- Offline Fallback Notice -->
+        <div class="offline-banner" id="offline-warning-banner">
+            <svg style="width: 20px; height: 20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <span>Offline Fallback Active: Real-time API unavailable. Risk evaluated using local geological baseline configurations.</span>
+        </div>
+
+        <!-- Dashboard Grid Layout -->
+        <main class="dashboard-grid">
+            <!-- Sidebar: Controls, Presets & Telemetry -->
+            <div class="dashboard-sidebar">
+                <!-- Search Inputs Section -->
+                <div class="glass-card search-card">
+                    <h2 class="section-title">Query Geographic Grid</h2>
+                    <div class="search-controls-stacked">
+                        <div class="input-group">
+                            <svg class="input-icon" style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input type="text" id="area-input" list="chennai-areas" placeholder="Search neighborhood (e.g. Velachery, Adyar...)" autocomplete="off">
+                            <datalist id="chennai-areas">
+                                <!-- Existing 20 -->
+                                <option value="Velachery"></option>
+                                <option value="Adyar"></option>
+                                <option value="T. Nagar"></option>
+                                <option value="Anna Nagar"></option>
+                                <option value="Tambaram"></option>
+                                <option value="Sholinganallur"></option>
+                                <option value="Porur"></option>
+                                <option value="Perambur"></option>
+                                <option value="Chromepet"></option>
+                                <option value="Kodambakkam"></option>
+                                <option value="Mylapore"></option>
+                                <option value="Guindy"></option>
+                                <option value="Nungambakkam"></option>
+                                <option value="Madipakkam"></option>
+                                <option value="Pallikaranai"></option>
+                                <option value="Besant Nagar"></option>
+                                <option value="Thiruvanmiyur"></option>
+                                <option value="Ambattur"></option>
+                                <option value="Avadi"></option>
+                                <option value="Manali"></option>
+                                <!-- North Chennai -->
+                                <option value="Ennore"></option>
+                                <option value="Tiruvottiyur"></option>
+                                <option value="Madhavaram"></option>
+                                <option value="Puzhal"></option>
+                                <option value="Kodungaiyur"></option>
+                                <option value="Tondiarpet"></option>
+                                <option value="Royapuram"></option>
+                                <option value="Washermanpet"></option>
+                                <option value="Vyasarpadi"></option>
+                                <!-- Central Chennai -->
+                                <option value="Kilpauk"></option>
+                                <option value="Ayanavaram"></option>
+                                <option value="Chetpet"></option>
+                                <option value="Egmore"></option>
+                                <option value="Purasawalkam"></option>
+                                <option value="Choolai"></option>
+                                <option value="Vadapalani"></option>
+                                <option value="Ashok Nagar"></option>
+                                <option value="KK Nagar"></option>
+                                <!-- South Chennai -->
+                                <option value="Saidapet"></option>
+                                <option value="Alandur"></option>
+                                <option value="Nanganallur"></option>
+                                <option value="Perungudi"></option>
+                                <option value="Kottivakkam"></option>
+                                <option value="Palavakkam"></option>
+                                <option value="Neelankarai"></option>
+                                <option value="Karapakkam"></option>
+                                <option value="Thoraipakkam"></option>
+                                <option value="Semmencheri"></option>
+                                <option value="Uthandi"></option>
+                                <!-- West Chennai -->
+                                <option value="Mogappair"></option>
+                                <option value="Nolambur"></option>
+                                <option value="Maduravoyal"></option>
+                                <option value="Valasaravakkam"></option>
+                                <option value="Ramapuram"></option>
+                                <option value="Virugambakkam"></option>
+                                <option value="Saligramam"></option>
+                                <option value="Koyambedu"></option>
+                                <option value="Nerkundram"></option>
+                            </datalist>
+                        </div>
+                        <div class="search-actions-row">
+                            <button class="btn btn-secondary" id="gps-locate-btn">
+                                <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                </svg>
+                                GPS Location
+                            </button>
+                            <button class="btn btn-primary" id="predict-risk-btn" style="flex: 1; justify-content: center;">
+                                Evaluate Flood Risk
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live City Snapshot widget -->
+                <div class="glass-card snapshot-card">
+                    <h2 class="section-title">City Hydrological Snapshot</h2>
+                    <div class="snapshot-content">
+                        <div class="snapshot-metric">
+                            <div class="snapshot-val" id="city-avg-risk">Evaluating...</div>
+                            <div class="snapshot-lbl">City Average Risk</div>
+                        </div>
+                        <div class="snapshot-status" id="city-status-text">
+                            Awaiting sensor synchronization.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historical Scenario simulator presets -->
+                <div class="glass-card presets-card">
+                    <h2 class="section-title">Historic Scenario Simulator</h2>
+                    <div class="subtitle" style="margin-bottom: 0.75rem;">Simulate extreme historic weather events in the model.</div>
+                    <div class="presets-grid">
+                        <button class="btn btn-secondary preset-btn" data-preset="clear" title="0mm rain, low sea tides, dry soil.">Clear Summer</button>
+                        <button class="btn btn-secondary preset-btn" data-preset="monsoon" title="Typical monsoon day rainfall, saturated soil.">Monsoon Baseline</button>
+                        <button class="btn btn-secondary preset-btn" data-preset="deluge_2015" title="Extreme northeast monsoon rainfall, critical saturation.">2015 Deluge</button>
+                        <button class="btn btn-secondary preset-btn" data-preset="michaung_2023" title="Coastal heavy rainfall coupled with astronomical high tide.">2023 Michaung</button>
+                    </div>
+                </div>
+
+                <!-- Emergency Broadcast Dispatcher Simulator -->
+                <div class="glass-card dispatcher-card">
+                    <h2 class="section-title">Emergency Broadcast Dispatcher</h2>
+                    <div class="subtitle" style="margin-bottom: 0.75rem;">Simulate real-time emergency warnings to local neighborhoods.</div>
+                    <div class="dispatcher-content">
+                        <div class="input-group" style="margin-bottom: 0.65rem;">
+                            <svg class="input-icon" style="width: 14px; height: 14px; left: 0.75rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                            </svg>
+                            <input type="tel" id="alert-phone" placeholder="Enter phone (e.g. +91 98765 43210)" style="padding-left: 2rem; font-size: 13px;">
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                            <button class="btn btn-secondary preset-btn" id="subscribe-alerts-btn" style="flex: 1; font-weight: 500;">
+                                Subscribe Phone
+                            </button>
+                            <button class="btn btn-secondary preset-btn" id="broadcast-test-btn" style="flex: 1; font-weight: 500;">
+                                Test Broadcast
+                            </button>
+                        </div>
+                        <div class="dispatcher-status" id="dispatcher-status-text" style="font-size: 11.5px; opacity: 0.85; display: flex; align-items: center; gap: 6px;">
+                            <span class="dispatcher-status-dot" id="dispatcher-dot"></span>
+                            <span>Monitor: Idle (Ready to broadcast)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Sensor Telemetry widget -->
+                <div class="glass-card telemetry-card">
+                    <h2 class="section-title">Live Grid Sensors Telemetry</h2>
+                    <div class="telemetry-feed" id="telemetry-feed-container">
+                        <!-- Populated dynamically by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spatial Map Column -->
+            <div class="glass-card map-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <h2 class="section-title" style="margin-bottom: 0;">Geological Risk Map</h2>
+                    <button class="btn btn-secondary" id="radar-toggle-btn" style="padding: 0.3rem 0.6rem; font-size: 11px; border-radius: 8px; height: 26px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">
+                        <span class="dispatcher-status-dot active" id="radar-dot" style="margin: 0;"></span>
+                        Toggle Storm Radar
+                    </button>
+                </div>
+                <div class="subtitle" style="margin-bottom: 0.75rem;">Spatial risk overlay of Chennai's lowlands and drainage basins. Click any zone to evaluate.</div>
+                <div class="map-radar-wrapper">
+                    <div id="map"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Interactive Dashboard Features Guide -->
+        <section class="glass-card features-guide-card">
+            <h2 class="section-title" style="margin-bottom: 0.25rem;">Dashboard Features Guide</h2>
+            <div class="subtitle" style="margin-bottom: 1rem;">Learn about the tools, inputs, and forecasting capabilities of the Chennai Flood Predictor.</div>
+            
+            <div class="guide-grid">
+                <!-- Feature 1 -->
+                <div class="guide-item">
+                    <h3 class="guide-title" style="margin-bottom: 0.5rem;">Query Geographic Grid</h3>
+                    <p class="guide-text">Allows searching for any of the 45+ Chennai neighborhoods or using your real-time GPS coordinates. It retrieves localized geographical attributes like elevation, drainage capacity, and distance to watercourses to assess local vulnerability.</p>
+                    <span class="guide-tag">Interactive Input</span>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="guide-item">
+                    <h3 class="guide-title" style="margin-bottom: 0.5rem;">Geological Risk Map</h3>
+                    <p class="guide-text">A geospatial visualization mapping relative flood hazards across Chennai. Neighborhood nodes are color-coded based on evaluated safety margins (Green: Low Risk, Orange: Moderate, Red: High/Severe). Click any node to load its detailed features instantly.</p>
+                    <span class="guide-tag">Geospatial Overlay</span>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="guide-item">
+                    <h3 class="guide-title" style="margin-bottom: 0.5rem;">Historic Presets</h3>
+                    <p class="guide-text">Contains presets to simulate historically significant weather events (such as the 2015 Deluge or 2023 Cyclone Michaung). It re-runs the XGBoost and LSTM models to demonstrate how the infrastructure would handle extreme atmospheric conditions.</p>
+                    <span class="guide-tag">Simulation Mode</span>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="guide-item">
+                    <h3 class="guide-title" style="margin-bottom: 0.5rem;">Sensors Telemetry</h3>
+                    <p class="guide-text">A live telemetry feed simulating inputs from real-time environmental sensors in Chennai. It tracks and displays fluctuating indicators like live rainfall rate (mm/h), cumulative 72h precipitation, soil moisture percentage, and astronomical sea tide levels.</p>
+                    <span class="guide-tag">Live Feed</span>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="guide-item">
+                    <h3 class="guide-title" style="margin-bottom: 0.5rem;">48h Precipitation Forecast</h3>
+                    <p class="guide-text">Powered by a custom LSTM (Long Short-Term Memory) recurrent neural network. It predicts upcoming rainfall volumes and calculates the dynamic hourly progression of local flood risk over the next two days, plotted on a dual-axis chart.</p>
+                    <span class="guide-tag">LSTM Forecast</span>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="guide-item">
+                    <h3 class="guide-title" style="margin-bottom: 0.5rem;">Model Explainability (SHAP)</h3>
+                    <p class="guide-text">Uses SHAP (SHapley Additive exPlanations) values to break down exactly which inputs (such as low elevation, high sea tides, or critical soil moisture saturation) pushed the XGBoost model to its final risk classification level.</p>
+                    <span class="guide-tag">AI Transparency</span>
+                </div>
+
+                <!-- Feature 7 -->
+                <div class="guide-item">
+                    <h3 class="guide-title" style="margin-bottom: 0.5rem;">Emergency Warning Dispatcher</h3>
+                    <p class="guide-text">Simulates sending emergency SMS warnings. After you sign up with a phone number, it will pop up a virtual smartphone showing safety alerts whenever the models detect high or severe flooding risk in your area.</p>
+                    <span class="guide-tag">Emergency Dispatch</span>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Loading spinner overlay -->
+        <div class="loading-overlay" id="loading-mask">
+            <div class="spinner"></div>
+            <div class="loading-text" id="loading-msg">Querying local grid sensors...</div>
+        </div>
+
+        <!-- Predictive analysis presentation -->
+        <section class="results-section" id="predict-results-block">
+            <!-- Dynamic Risk Level Status Banner -->
+            <div class="status-banner" id="results-banner">
+                <!-- SVG Icon will be inserted programmatically -->
+                <div id="results-banner-icon"></div>
+                <div style="display: flex; flex-direction: column;">
+                    <span style="font-weight: 800; font-size: 18px;" id="banner-risk-level">HIGH RISK ALERT</span>
+                    <span style="font-size: 13px; opacity: 0.9;" id="banner-risk-summary">Soil saturation threshold exceeded. Localized street flooding highly likely.</span>
+                </div>
+            </div>
+
+            <!-- Quantitative parameters list (2x2 Grid) -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Flood Probability</div>
+                    <div class="metric-value" id="val-risk-pct" style="color: var(--high-text);">92%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Expected Duration</div>
+                    <div class="metric-value" id="val-rain-dur">24h</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Cumulative Rainfall</div>
+                    <div class="metric-value" id="val-cum-rain">145 mm</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Peak Intensity</div>
+                    <div class="metric-value" id="val-peak-rate">28 mm/h</div>
+                </div>
+            </div>
+
+            <!-- Forecast Horizontal View -->
+            <div class="glass-card forecast-container-card">
+                <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 0.25rem;">48-Hour Precipitation Forecast</h2>
+                <div class="subtitle" style="margin-bottom: 1.25rem;">LSTM neural network generated projections based on regional atmospheric flows.</div>
+                
+                <div class="forecast-scroll-container">
+                    <div class="forecast-row" id="forecast-cards-container">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dual axis Chart.js container -->
+            <div class="glass-card chart-card">
+                <canvas id="forecastChart"></canvas>
+            </div>
+
+            <!-- ML Explanations vs Tactical Recommendations grid -->
+            <div class="explain-consequences-grid">
+                <div class="glass-card shap-card">
+                    <h2 style="font-size: 18px; font-weight: 700; color: #ffffff;">Model Explainability (SHAP)</h2>
+                    <div class="subtitle">Calculated feature contribution values that drove the current classification risk.</div>
+                    <div class="shap-list" id="shap-reasons-container">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
+                <div class="glass-card recommendations-card">
+                    <h2 style="font-size: 18px; font-weight: 700; color: #ffffff;">Action Recommendations</h2>
+                    <div class="subtitle">Hydrological mitigation guidelines mapping to the evaluated risk magnitude.</div>
+                    <div class="consequences-list" id="consequences-container">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help and Action buttons row -->
+            <div class="action-buttons-row">
+                <button class="btn btn-secondary" id="help-explain-btn">
+                    What are these parameters?
+                </button>
+                <button class="btn btn-secondary" id="help-historical-btn">
+                    Historical Validation Events
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal dialogue: Parameter descriptions -->
+    <dialog id="modal-params">
+        <div class="dialog-header">
+            <h3>Hydrological Parameters Explained</h3>
+            <button class="dialog-close" id="close-params-btn">&times;</button>
+        </div>
+        <div class="dialog-content">
+            <p>Our model evaluates several critical geological and atmospheric sensors to forecast local flood hazard probabilities:</p>
+            <ul>
+                <li><strong>Flood Probability:</strong> The probability calculated by the XGBoost ensemble classifier that water accumulation will exceed storm drainage capabilities.</li>
+                <li><strong>Expected Duration:</strong> Synthesized by the LSTM recurrent neural network representing the time window of active cloud rainfall.</li>
+                <li><strong>Cumulative Rainfall:</strong> The cumulative millimetric volume of rain expected over the sliding 72-hour period.</li>
+                <li><strong>Peak Intensity:</strong> The highest expected hourly rainfall rate (in mm/hour), key in determining urban flash drainage bypass triggers.</li>
+                <li><strong>Elevation (Local Zone):</strong> Metric distance above sea level. Lower coastal elevations are highly susceptible to backwater lockage.</li>
+                <li><strong>Drainage Capacity:</strong> Architectural efficiency index representing stormwater pipeline discharge rates.</li>
+            </ul>
+        </div>
+    </dialog>
+
+    <!-- Modal dialogue: Historical flood scenarios -->
+    <dialog id="modal-historical">
+        <div class="dialog-header">
+            <h3>Historical Flood Event Validations</h3>
+            <button class="dialog-close" id="close-historical-btn">&times;</button>
+        </div>
+        <div class="dialog-content">
+            <p>Our machine learning models are calibrated and rigorously tested against historical Chennai precipitation crises:</p>
+            <ul>
+                <li><strong>November/December 2015 Deluge:</strong> Extreme northeast monsoon rainfall matching ~350mm cumulative accumulation in 24 hours. Under this validation test, the model correctly triggers an immediate <strong>High Risk</strong> alert for lowland marsh fringes like Velachery and Pallikaranai.</li>
+                <li><strong>December 2021 Cloudbursts:</strong> Unpredicted localized thunderstorms causing rapid 150mm accumulation in hours. The model successfully detects immediate soil moisture saturation risks in central dense flatlands like T. Nagar and Kodambakkam.</li>
+                <li><strong>December 2023 Cyclone Michaung:</strong> Heavy coastal rain bands accompanied by tidal surges of ~1.2m. The model models low elevation coupled with elevated river discharge paths, predicting suburban waterlogging.</li>
+            </ul>
+        </div>
+    </dialog>
+
+    <!-- Glassmorphic Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Phone Warning Simulation Popup Overlay -->
+    <div id="phone-simulation-overlay" class="phone-overlay">
+        <div class="phone-frame">
+            <div class="phone-screen">
+                <div class="phone-screen-header">
+                    <span class="phone-time">01:34</span>
+                    <div class="phone-speaker"></div>
+                    <span class="phone-battery">🔋 98%</span>
+                </div>
+                <div class="phone-screen-body">
+                    <div class="phone-app-header">
+                        <div class="sms-icon-box">💬</div>
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <span class="sms-sender">NDMA Emergency Alert</span>
+                            <span class="sms-timestamp">Emergency Broadcast Service</span>
+                        </div>
+                    </div>
+                    <div class="sms-bubble">
+                        <div class="sms-title">🚨 CRITICAL FLOOD WARNING</div>
+                        <div id="sms-text-content">Extreme precipitation detected. Your area is evaluated at SEVERE RISK. Evacuate immediately if water level rises. Avoid driving. Call 1913 for help.</div>
+                    </div>
+                    <button class="phone-close-btn" id="phone-close-btn">Dismiss Notification</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Animated Flood Waves at the bottom -->
+    <div class="flood-waves-container">
+        <svg class="waves" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+        viewBox="0 24 150 28" preserveAspectRatio="none" shape-rendering="auto">
+            <defs>
+                <path id="gentle-wave" d="M-160 44c30 0 58-18 88-18s58 18 88 18 58-18 88-18 58 18 88 18 v44h-352z" />
+            </defs>
+            <g class="parallax">
+                <use xlink:href="#gentle-wave" x="48" y="0" fill="rgba(0, 242, 254, 0.04)" />
+                <use xlink:href="#gentle-wave" x="48" y="3" fill="rgba(79, 172, 254, 0.06)" />
+                <use xlink:href="#gentle-wave" x="48" y="5" fill="rgba(0, 122, 255, 0.08)" />
+                <use xlink:href="#gentle-wave" x="48" y="7" fill="rgba(0, 50, 150, 0.12)" />
+            </g>
+        </svg>
+    </div>
+
+    <!-- Inline SVG Liquid Caustic Shader Filter -->
+    <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <filter id="liquid-caustics">
+                <feTurbulence type="fractalNoise" baseFrequency="0.015 0.02" numOctaves="3" result="noise">
+                    <animate attributeName="baseFrequency" dur="40s" values="0.01 0.015;0.02 0.025;0.01 0.015" repeatCount="indefinite" />
+                </feTurbulence>
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="30" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+        </defs>
+    </svg>
+
+    <!-- UI logic orchestration -->
+    <script src="app.js?v=11"></script>
+</body>
+</html>
