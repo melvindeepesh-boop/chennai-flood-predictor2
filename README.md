@@ -1,4 +1,15 @@
+---
+title: Chennai Flood Predictor
+emoji: ⛈️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Chennai Flood Predictor (XGBoost & LSTM Hydrological Ensemble)
+
 
 An immersive, high-tech early warning system and predictive dashboard for monitoring and forecasting flood risks across the Chennai Metropolitan hydrological zone. 
 
