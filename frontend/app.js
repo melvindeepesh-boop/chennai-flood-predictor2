@@ -1956,7 +1956,31 @@ async function handleGPSRequest() {
                     }
                 }
             } catch (ipErr) {
-                console.error("IP geolocation fallback failed: ", ipErr);
+                console.warn("Backend IP geolocation failed, trying direct public geocoder...");
+                try {
+                    const directRes = await fetch("https://ipapi.co/json/");
+                    if (directRes.ok) {
+                        const ipData = await directRes.json();
+                        const lat = ipData.latitude;
+                        const lon = ipData.longitude;
+                        
+                        const isWithinChennai = (lat >= 12.75 && lat <= 13.35) && (lon >= 79.95 && lon <= 80.4);
+                        if (isWithinChennai) {
+                            await proceedWithCoords(lat, lon);
+                            return;
+                        } else {
+                            const useMock = confirm(`Your IP coordinates (${lat.toFixed(4)}, ${lon.toFixed(4)}) locate you in ${ipData.city || 'unknown'}, ${ipData.region || 'unknown'}, which is outside the Chennai zone.\n\nWould you like to simulate a GPS location inside Chennai (Velachery) for testing?`);
+                            if (useMock) {
+                                await proceedWithCoords(12.9815, 80.2180);
+                            } else {
+                                loadingMask.classList.remove("active");
+                            }
+                            return;
+                        }
+                    }
+                } catch (directErr) {
+                    console.error("Direct public IP geolocation failed: ", directErr);
+                }
             }
             
             let errMsg = "Unable to retrieve your location.";
