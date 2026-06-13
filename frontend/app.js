@@ -622,7 +622,7 @@ async function playCurrentTrack() {
         if (currentAudioTrack === "heavy") {
             url = "static/u_u6ti8mxhyp-heavy-rain-and-thunder-370985.mp3";
         } else if (currentAudioTrack === "natural") {
-            url = "static/freesound_community-rain-and-thunder-16705.mp3";
+            url = "static/freesound_community-rain-and-thunder-16705.m4a";
         }
 
         const button = document.getElementById("audio-toggle-btn");

@@ -5,3 +5,5 @@ backend/model/__pycache__/
 backend/saved_models/*.h5
 backend/saved_models/*.pkl
 .DS_Store
+backend/data/chennai_synthetic_data.csv
+
